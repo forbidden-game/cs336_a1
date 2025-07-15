@@ -1,6 +1,7 @@
 import regex as re
 import os
 import multiprocessing
+import collections
 from collections import Counter
 from typing import BinaryIO
 
@@ -59,15 +60,21 @@ def find_chunk_boundaries(
     return sorted(set(chunk_boundaries))
 
 def pretokenization_worker(
-    corpus_path: str, start_offset: int, end_offset: int
+    corpus_path: str, start_offset: int, end_offset: int, split_special_tokens: list[str]
 ) -> Counter:
     
     with open(corpus_path, 'rb') as f:
         f.seek(start_offset)
         chunk = f.read(end_offset-start_offset)
     
+    remove_pat = "".join(re.escape(special_token) for special_token in split_special_tokens)
+    print(remove_pat)
+    remove_special_tokens_chunk = "".join(re.split(remove_pat, chunk.decode('utf-8', errors='ignore')))
+    # print(remove_special_tokens_chunk)
+    
     PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
-    splited_chunk = re.findall(PAT, chunk.decode('utf-8', errors='ignore'))
+    splited_chunk = re.findall(PAT, remove_special_tokens_chunk)
+    # print(splited_chunk)
     
     return Counter(splited_chunk)
 
@@ -77,7 +84,7 @@ def parallelized_pretokenize(
 ) -> Counter:
     
     chunk_offsets = find_chunk_boundaries(corpus_path, num_workers)
-    worker_args = [(corpus_path, start, end) for start, end in zip(chunk_offsets[:-1], chunk_offsets[1:])]
+    worker_args = [(corpus_path, start, end, "<|endoftext|>") for start, end in zip(chunk_offsets[:-1], chunk_offsets[1:])]
     
     print("--------Start Parallel Processing--------")
     with multiprocessing.Pool(processes=num_workers) as pool:
@@ -94,4 +101,6 @@ corpus_path = "/home/lucain/workspace/assignment1-basics/data/TinyStoriesV2-GPT4
 
 tc = parallelized_pretokenize(6, corpus_path)
 
-print(tc)
+top_50 = tc.most_common(50)
+for key, value in top_50:
+    print(f"{key}: {value}")
