@@ -5,9 +5,9 @@ import collections
 from collections import Counter
 from typing import BinaryIO
 
-vocab = {}
+vocab_bytes = {}
 for i in range(256):
-    vocab[i] = bytes([i])
+    vocab_bytes[i] = bytes([i])
     
 
 def find_chunk_boundaries(
@@ -99,7 +99,7 @@ def parallelized_pretokenize(
 
 def get_stats(
     vocab: dict,
-) -> dict[bytes, int]:
+) -> dict[str, int]:
     
     pairs = collections.defaultdict(int)
     for word, freq in vocab.items():
@@ -108,11 +108,41 @@ def get_stats(
             pairs[symbols[i], symbols[i+1]] += freq
     return pairs
     
+def merging(
+    pretokened_vovab: dict,
+    pair_to_merge: tuple
+):
+    pretokened_vovab[pair_to_merge[0]] = pair_to_merge[1]
+    
+    
 
 def train_bpe(
     input_path: str,
     vocab_size: int,
     special_tokens: list[str]
 ) -> tuple[dict[int, bytes], list[tuple[bytes, bytes]]]:
+    
+    assert(vocab_size > 255)
+    
+    pretokened_vovab = parallelized_pretokenize(6, input_path)
+    merges = []
+    
+    for i in range(len(special_tokens)):
+        vocab_bytes[i+256] = special_tokens[i].encode('utf-8')
+    assert(len(vocab_bytes) < vocab_size)
+    
+    for i in range(vocab_size - 256 - len(special_tokens)):
+        pairs = get_stats(pretokened_vovab)
+        pair_to_merge = max(pairs, pairs.get)
+        pair_to_merge_freq = pairs.get(pair_to_merge)
+        
+        merging(pretokened_vovab, (pair_to_merge, pair_to_merge_freq))
+        
+        merges.append((pair_to_merge[0].encode('utf-8'), pair_to_merge[1].encode('utf-8')))
+        vocab_bytes[i+256+len(special_tokens)] =  pair_to_merge[0].join(pair_to_merge[1]).encode('utf-8')
+        
+    return vocab_bytes, merges
+    
+    
     
     
