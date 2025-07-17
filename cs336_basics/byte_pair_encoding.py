@@ -58,7 +58,7 @@ def pretokenize_worker(
     start_pos: int,
     end_pos: int,
     special_tokens: list[str]
-) -> dict[tuple[bytes, ...], int]:
+) -> tuple[dict[tuple[bytes, ...], int], dict[tuple[bytes, bytes], int]]:
     
     with open(corpus_path, 'rb') as file:
         file.seek(start_pos)
@@ -76,50 +76,21 @@ def pretokenize_worker(
             words = re.findall(PAT, chunk)
             word_counts.update(words)
     
-    # return {tuple(token.encode('utf-8')): freq for token, freq in word_counts.items()}
+    # Convert words to byte-tuples and count initial pairs
     pretokens = {}
+    pair_counts = collections.defaultdict(int)
+    
     for word, freq in word_counts.items():
         # Correctly convert a word like "low" into (b'l', b'o', b'w')
-        # This is the crucial change.
         byte_tuple = tuple(bytes([b]) for b in word.encode('utf-8'))
         pretokens[byte_tuple] = freq
         
-    return pretokens
+        # Count initial pairs in this word
+        for i in range(len(byte_tuple) - 1):
+            pair_counts[(byte_tuple[i], byte_tuple[i+1])] += freq
+        
+    return pretokens, dict(pair_counts)
     
-def pair(
-    tokens: dict[tuple[bytes, ...], int]
-) -> dict[tuple[bytes, ...], int]:
-    
-    paired_tokens = collections.defaultdict(int)
-    
-    for token, freq in tokens.items():
-        for i in range(len(token)-1):
-            paired_tokens[(token[i], token[i+1])] += freq
-    
-    return paired_tokens
-
-def merge(
-    tokens: dict[tuple[bytes, ...], int],
-    pair_to_merge: tuple[bytes, bytes]
-) -> dict[tuple[bytes, ...], int]:
-    
-    merged_out = {}
-    p1, p2 = pair_to_merge
-    merged_pair = p1 + p2
-    
-    for token, freq in tokens.items():
-        i = 0
-        merged_token = []
-        while i < len(token):
-            if i < len(token) - 1 and token[i] == p1 and token[i+1] == p2:
-                merged_token.append(merged_pair)
-                i += 2
-            else:
-                merged_token.append(token[i])
-                i += 1
-        merged_out[tuple(merged_token)] = freq
-    
-    return merged_out   
 
 def train_bpe(
     input_path: str,
@@ -129,53 +100,87 @@ def train_bpe(
     
     assert vocab_size > 256 + len(special_tokens), "TOO SMALL VOCAB_SIZE!"
     
+    # Step 1: Pre-tokenization and Initial Counts (Optimized)
     num_workers = multiprocessing.cpu_count()
     with open(input_path, 'rb') as file:
         chunks = find_chunk_boundaries(file, num_workers, [token.encode('utf-8') for token in special_tokens])
         
-        print("----------start multiprocess----------")
-        args = [(input_path, start_pos, end_pos, special_tokens) for start_pos, end_pos in zip(chunks[:-1], chunks[1:])]
-        with multiprocessing.Pool(processes=num_workers) as pool:
-            multi_pretokens = pool.starmap(pretokenize_worker, args)
-        print("----------end multiprocess----------")
-        pretokens = Counter()
-        for pretoken in multi_pretokens:
-            pretokens.update(pretoken)
+    print("----------start multiprocess----------")
+    args = [(input_path, start_pos, end_pos, special_tokens) for start_pos, end_pos in zip(chunks[:-1], chunks[1:])]
+    with multiprocessing.Pool(processes=num_workers) as pool:
+        # Each worker returns a tuple of (word_counts, pair_counts)
+        results = pool.starmap(pretokenize_worker, args)
+    print("----------end multiprocess----------")
     
-    pretoken_dict = dict(pretokens)
+    # Aggregate results from all workers
+    word_counts = collections.defaultdict(int)
+    pair_counts = collections.defaultdict(int)
+    for wc, pc in results:
+        for word, freq in wc.items():
+            word_counts[word] += freq
+        for pair, freq in pc.items():
+            pair_counts[pair] += freq
+    
+    # Step 2: Initialize vocabulary
     merges = []
     vocab = {i: bytes([i]) for i in range(256)}
-    for i in range(len(special_tokens)):
-        vocab[256+i] = special_tokens[i].encode('utf-8')
-
-    base_vocab_size = 256 + len(special_tokens)
-    for i in range(base_vocab_size, vocab_size):
+    for i, token in enumerate(special_tokens):
+        vocab[256 + i] = token.encode('utf-8')
+    
+    # Step 3: Iterative Merging (The "Fast BPE" Algorithm)
+    num_merges = vocab_size - len(vocab)
+    for merge_step in range(num_merges):
+        if not pair_counts:
+            break  # No more pairs to merge
         
-        pairs = pair(pretoken_dict)
-        pair_to_merge = max(pairs, key=lambda p: (pairs[p], p))
-        merges.append(pair_to_merge)
-        vocab[i] = pair_to_merge[0] + pair_to_merge[1]
-
-        pretoken_dict = merge(pretoken_dict, pair_to_merge)
+        # Find the best pair to merge
+        best_pair = max(pair_counts, key=lambda p: (pair_counts[p], p))
+        best_count = pair_counts[best_pair]
+        merges.append(best_pair)
+        new_token = best_pair[0] + best_pair[1]
+        vocab[len(vocab)] = new_token
+        
+        # Update word_counts and pair_counts incrementally
+        new_word_counts = {}
+        # Remove the count for the pair we're merging
+        del pair_counts[best_pair]
+        
+        for word_tuple, freq in word_counts.items():
+            # Check if this word contains the best_pair
+            if len(word_tuple) < 2:
+                new_word_counts[word_tuple] = freq
+                continue
+                
+            # Merge the best_pair in this word
+            i = 0
+            new_word = []
+            while i < len(word_tuple):
+                if i < len(word_tuple) - 1 and word_tuple[i] == best_pair[0] and word_tuple[i+1] == best_pair[1]:
+                    new_word.append(new_token)
+                    i += 2
+                else:
+                    new_word.append(word_tuple[i])
+                    i += 1
+            
+            new_word_tuple = tuple(new_word)
+            new_word_counts[new_word_tuple] = freq
+            
+            # If the word changed, update pair counts
+            if new_word_tuple != word_tuple:
+                # Remove old pairs
+                for j in range(len(word_tuple) - 1):
+                    old_pair = (word_tuple[j], word_tuple[j+1])
+                    pair_counts[old_pair] -= freq
+                    if pair_counts[old_pair] <= 0:
+                        del pair_counts[old_pair]
+                
+                # Add new pairs
+                for j in range(len(new_word_tuple) - 1):
+                    new_pair = (new_word_tuple[j], new_word_tuple[j+1])
+                    if new_pair not in pair_counts:
+                        pair_counts[new_pair] = 0
+                    pair_counts[new_pair] += freq
+        
+        word_counts = new_word_counts
         
     return vocab, merges
-
-# if __name__ == '__main__':
-    # Example usage:
-    # Create a dummy corpus file for demonstration
-    # dummy_corpus_path = "dummy_corpus.txt"
-    # with open(dummy_corpus_path, "w", encoding="utf-8") as f:
-    #     f.write("hello world<|endoftext|>\n")
-    #     f.write("hello there, this is a low-resource test.\n")
-    #     f.write("The lowest of the low.\n")
-        
-    # special_tokens = ["<|endoftext|>", "<|pad|>"]
-    # vocab_size = 500 # 256 bytes + 2 special + 42 merges
-    
-    # final_vocab, merges = train_bpe("/home/lucain/workspace/assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt", vocab_size, special_tokens)
-    
-    # print("\n--- Training Complete ---")
-    # print(f"Final Vocab Size: {len(final_vocab)}")
-    # print("First 10 merges:")
-    # for p1, p2 in merges[:10]:
-    # print(f"  {p1.decode('utf-8', 'ignore')} + {p2.decode('utf-8', 'ignore')} -> {(p1+p2).decode('utf-8', 'ignore')}")
