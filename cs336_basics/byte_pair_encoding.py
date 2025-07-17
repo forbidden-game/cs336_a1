@@ -66,14 +66,15 @@ def pretokenize_worker(
         
     # It's safer to decode with an error handler
     chunk_str = chunk.decode('utf-8', errors='ignore')
-
-    remove_tokens_pat = ''.join(re.escape(token) for token in special_tokens)
-    removed_tokens = "".join(re.split(remove_tokens_pat, chunk_str))
-    
     PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
-    words = re.findall(PAT, removed_tokens)
+    remove_tokens_pat = '|'.join(re.escape(token) for token in special_tokens)
     
-    word_counts = Counter(words)
+    word_counts = Counter()
+    text_chunks = re.split(remove_tokens_pat, chunk_str)
+    for chunk in text_chunks:
+        if chunk:
+            words = re.findall(PAT, chunk)
+            word_counts.update(words)
     
     # return {tuple(token.encode('utf-8')): freq for token, freq in word_counts.items()}
     pretokens = {}
