@@ -122,9 +122,10 @@ def train_bpe(
     special_tokens: list[str]
 ) -> tuple[dict[int, bytes], list[tuple[bytes, bytes]]]:
     
-    assert(vocab_size > 255)
+    assert vocab_size > 256 + len(special_tokens), "TOO SMALL VOCAB SIZE!"
+    num_workers = multiprocessing.cpu_count()
     
-    pretokened_vovab = parallelized_pretokenize(6, input_path)
+    pretokened_vovab = parallelized_pretokenize(num_workers, input_path)
     merges = []
     
     for i in range(len(special_tokens)):

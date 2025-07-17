@@ -1,6 +1,8 @@
 import os
 from typing import BinaryIO
 
+num_processes = 10
+
 def find_chunk_boundaries(
     file: BinaryIO, 
     desired_num_chunks: int, 
@@ -50,7 +52,7 @@ def find_chunk_boundaries(
     return sorted(set(chunk_boundaries))
 
 ## Usage
-with open(..., "rb") as f:
+with open("/home/lucain/workspace/assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt", "rb") as f:
     boundaries = find_chunk_boundaries(
         f, num_processes, "<|endoftext|>".encode("utf-8"))
         
@@ -59,4 +61,9 @@ with open(..., "rb") as f:
     for start, end in zip(boundaries[:-1], boundaries[1:]):
         f.seek(start)
         chunk = f.read(end - start).decode("utf-8", errors="ignore")
+        print(chunk[:50])
+        print("-" * 30)
+        print("\n")
         # Run pre-tokenization on your chunk and store the counts for each pre-token
+        
+        

@@ -36,7 +36,7 @@ def find_chunk_boundaries(
             f.seek(seek_pos)
             
             # Read a buffer that is large enough to likely contain the token
-            buffer = f.read(chunk_size // 10) 
+            buffer = f.read(chunk_size // 10)
             if not buffer:
                 continue
 
@@ -71,7 +71,7 @@ def get_word_vocab_from_chunk(
     pre_tokens = re.findall(PAT, text)
     return Counter(pre_tokens)
 
-def get_stats(vocab: Dict[Tuple[str, ...], int]) -> Dict[Tuple[str, str], int]:
+def get_stats(vocab: Dict[Tuple[bytes, ...], int]) -> Dict[Tuple[str, str], int]:
     """Calculates frequency of adjacent pairs in the vocabulary."""
     pairs = collections.defaultdict(int)
     for word_tuple, freq in vocab.items():
@@ -126,7 +126,7 @@ def train_bpe(
 
     # 2. Initialize BPE vocabulary from character splits
     # e.g., "hello": 5 -> ('h', 'e', 'l', 'l', 'o'): 5
-    bpe_vocab = {tuple(word): freq for word, freq in word_counts.items()}
+    bpe_vocab = {tuple(word.encode('utf-8')): freq for word, freq in word_counts.items()}
     
     # 3. Add special tokens and build initial vocab
     merges = []
@@ -166,24 +166,24 @@ def train_bpe(
         
     return final_vocab, merges
 
-if __name__ == '__main__':
-    # Example usage:
-    # Create a dummy corpus file for demonstration
-    dummy_corpus_path = "dummy_corpus.txt"
-    with open(dummy_corpus_path, "w", encoding="utf-8") as f:
-        f.write("hello world<|endoftext|>\n")
-        f.write("hello there, this is a low-resource test.\n")
-        f.write("The lowest of the low.\n")
+# if __name__ == '__main__':
+#     # Example usage:
+#     # Create a dummy corpus file for demonstration
+#     dummy_corpus_path = "dummy_corpus.txt"
+#     with open(dummy_corpus_path, "w", encoding="utf-8") as f:
+#         f.write("hello world<|endoftext|>\n")
+#         f.write("hello there, this is a low-resource test.\n")
+#         f.write("The lowest of the low.\n")
         
-    special_tokens = ["<|endoftext|>", "<|pad|>"]
-    vocab_size = 10000 # 256 bytes + 2 special + 42 merges
+#     special_tokens = ["<|endoftext|>", "<|pad|>"]
+#     vocab_size = 10000 # 256 bytes + 2 special + 42 merges
     
-    final_vocab, merges = train_bpe("/home/lucain/workspace/assignment1-basics/data/TinyStoriesV2-GPT4-train.txt", vocab_size, special_tokens)
+#     final_vocab, merges = train_bpe("/home/lucain/workspace/assignment1-basics/data/TinyStoriesV2-GPT4-train.txt", vocab_size, special_tokens)
     
-    print("\n--- Training Complete ---")
-    print(f"Final Vocab Size: {len(final_vocab)}")
-    print("First 10 merges:")
-    for p1, p2 in merges[:10]:
-        print(f"  {p1.decode('utf-8', 'ignore')} + {p2.decode('utf-8', 'ignore')} -> {(p1+p2).decode('utf-8', 'ignore')}")
+#     print("\n--- Training Complete ---")
+#     print(f"Final Vocab Size: {len(final_vocab)}")
+#     print("First 10 merges:")
+#     for p1, p2 in merges[:10]:
+#         print(f"  {p1.decode('utf-8', 'ignore')} + {p2.decode('utf-8', 'ignore')} -> {(p1+p2).decode('utf-8', 'ignore')}")
 
-    os.remove(dummy_corpus_path)
+#     os.remove(dummy_corpus_path)
