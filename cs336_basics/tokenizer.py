@@ -1,5 +1,7 @@
 import os
 import multiprocessing
+import json
+
 
 class tokenizer:
     def __init__(
@@ -40,4 +42,14 @@ def from_files(
         special_tokens: list[str] | None = None
     ) -> tokenizer:
 
-        vocab = 
+
+        with open(vocab_filepath, 'r') as f:
+            vocab = {index: token.encode('utf-8') for index, token in json.load(f).items()}
+        merges = []
+        with open(merges_filepath, 'r') as f:
+            for p1, p2 in json.load(f).items():
+                merges.append((p1, p2))
+        
+        return tokenizer(vocab, merges, special_tokens)
+                
+            
