@@ -42,12 +42,11 @@ def from_files(
         special_tokens: list[str] | None = None
     ) -> tokenizer:
 
-
-        with open(vocab_filepath, 'r') as f:
+        with open(vocab_filepath, 'r', encoding='utf-8') as f:
             vocab = {index: token.encode('utf-8') for index, token in json.load(f).items()}
         merges = []
-        with open(merges_filepath, 'r') as f:
-            for p1, p2 in json.load(f).items():
+        with open(merges_filepath, 'r', encoding='utf-8') as f:
+            for p1, p2 in json.load(f):
                 merges.append((p1, p2))
         
         return tokenizer(vocab, merges, special_tokens)
