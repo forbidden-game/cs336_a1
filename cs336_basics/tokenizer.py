@@ -20,6 +20,9 @@ class tokenizer:
         text: str
     ) -> list[int]:
         
+        PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
+        pre_
+        
         
     def encode_iterable(
         self,
@@ -47,7 +50,7 @@ def from_files(
         merges = []
         with open(merges_filepath, 'r', encoding='utf-8') as f:
             for p1, p2 in json.load(f):
-                merges.append((p1, p2))
+                merges.append((p1.encode('utf-8'), p2.encode('utf-8')))
         
         return tokenizer(vocab, merges, special_tokens)
                 
