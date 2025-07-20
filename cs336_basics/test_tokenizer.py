@@ -13,6 +13,17 @@ class tokenizer:
         self.merges = merges
         self.special_tokens = special_tokens
         
+        if special_tokens:
+            bytes_special_tokens = [st.encode('utf-8') for st in special_tokens]
+            next_id = next(reversed(vocab.keys())) + 1
+            
+            for bst in bytes_special_tokens:
+                if bst not in self.vocab.values():
+                    self.vocab[next_id] = bst
+                    next_id += 1
+                    # for debug
+                    # print(f"current id is {next_id - 1}, bst is {bst}")
+                    
         
     def encode(
         self,
@@ -26,7 +37,7 @@ class tokenizer:
             remove_tokens_pat = '|'.join(re.escape(token) for token in self.special_tokens)
             for chunk in re.split(remove_tokens_pat, text):
                 if chunk:
-                    words.append(re.findall(PAT, chunk))
+                    words.extend(re.findall(PAT, chunk))
         else:
             words = re.findall(PAT, text)
         
@@ -83,7 +94,7 @@ def from_files(
     ) -> tokenizer:
 
         with open(vocab_filepath, 'r', encoding='utf-8') as f:
-            vocab = {index: bytes.fromhex(token) for index, token in json.load(f).items()}
+            vocab = {int(index): bytes.fromhex(token) for index, token in json.load(f).items()}
         merges = []
         with open(merges_filepath, 'r', encoding='utf-8') as f:
             for p1, p2 in json.load(f):
@@ -96,10 +107,11 @@ if __name__ == "__main__":
     
     
     test_str = "hello! I am.      panxiezhao 980402..... "
+    st = ["he", "    ", "98", "123"]
     vocab_filepath = "/home/lucain/workspace/assignment1-basics/train_bpe_expts_owt/hex_vocab.json"
     merges_filepath = "/home/lucain/workspace/assignment1-basics/train_bpe_expts_owt/hex_merges.json"
     
-    test_tokenizer = from_files(tokenizer, vocab_filepath, merges_filepath)
+    test_tokenizer = from_files(tokenizer, vocab_filepath, merges_filepath, st)
     
     result = test_tokenizer.encode(test_str)
     print(result)
