@@ -1,6 +1,7 @@
 import os
 import multiprocessing
 import json
+import regex as re
 
 
 class tokenizer:
@@ -8,7 +9,7 @@ class tokenizer:
         self,
         vocab: dict[int, bytes],
         merges: list[tuple[bytes, bytes]],
-        special_tokens=list[str] | None = None
+        special_tokens: list[str] | None = None,
         ) -> None:
         self.vocab = vocab
         self.merges = merges
@@ -21,7 +22,41 @@ class tokenizer:
     ) -> list[int]:
         
         PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
-        pre_
+        words = re.findall(PAT, text)
+        
+        text_token = []
+        text_token_encode = []
+        
+        for word in words:
+            word_bytes = [bytes([c]) for c in word.encode('utf-8')]
+            
+            word_token = []
+            word_length = len(word_bytes)
+            if word_length == 1:
+                word_token = word_bytes
+            else:
+                i = 0
+                while i < word_length - 1:
+                    pair = (word_bytes[i], word_bytes[i+1])
+                    if pair in self.merges:                    
+                        # replace with new token
+                        new_token = pair[0] + pair[1]
+                        word_bytes[i+1] = new_token
+                        word_token.append(new_token)
+                    else:
+                        word_token.append(word_bytes[i])
+                    
+                    i += 1
+            text_token.extend(word_token)
+        
+        for wt in text_token:
+            for t in wt:
+                for integer, vocab in self.vocab.items():
+                    if t == vocab:
+                       text_token_encode.append(integer)
+        
+        return text_token_encode          
+            
         
         
     def encode_iterable(
