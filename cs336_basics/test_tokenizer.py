@@ -67,12 +67,11 @@ class tokenizer:
 
         print(f"text_token: {text_token}")
         print(f"len_text_token: {len(text_token)}")
+        
+        # create tokens_to_ids for fast encoding
+        tokens_to_ids = {token: id for id, token in self.vocab.items()}
         for token in text_token:
-            for integer, vocab in self.vocab.items():
-                if token == vocab:
-                    # print(f"int {integer}, token {token}")
-                    text_token_encode.append(integer)
-                    # break
+            text_token_encode.append(tokens_to_ids[token])
         
         return text_token_encode
     
