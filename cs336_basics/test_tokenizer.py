@@ -63,15 +63,16 @@ class tokenizer:
                 print(f"word_token: {word_token}")
 
             text_token.extend(word_token)
-            print(f"text_token: {text_token}")        
+                    
 
-        
+        print(f"text_token: {text_token}")
+        print(f"len_text_token: {len(text_token)}")
         for token in text_token:
             for integer, vocab in self.vocab.items():
                 if token == vocab:
                     # print(f"int {integer}, token {token}")
                     text_token_encode.append(integer)
-                    break
+                    # break
         
         return text_token_encode
     
@@ -83,20 +84,24 @@ def from_files(
     ) -> tokenizer:
 
         with open(vocab_filepath, 'r', encoding='utf-8') as f:
-            vocab = {index: token.encode('utf-8') for index, token in json.load(f).items()}
+            vocab = {index: bytes.fromhex(token) for index, token in json.load(f).items()}
         merges = []
         with open(merges_filepath, 'r', encoding='utf-8') as f:
             for p1, p2 in json.load(f):
-                merges.append((p1.encode('utf-8'), p2.encode('utf-8')))
+                merges.append((bytes.fromhex(p1), bytes.fromhex(p2)))
         
         return tokenizer(vocab, merges, special_tokens)
     
 
 if __name__ == "__main__":
     
-    vocab_filepath = "/home/lucain/workspace/assignment1-basics/train_bpe_expts_owt/vocab.json"
-    merges_filepath = "/home/lucain/workspace/assignment1-basics/train_bpe_expts_owt/merges.json"
+    
+    test_str = "hello! I am.      panxiezhao 980402..... "
+    vocab_filepath = "/home/lucain/workspace/assignment1-basics/train_bpe_expts_owt/hex_vocab.json"
+    merges_filepath = "/home/lucain/workspace/assignment1-basics/train_bpe_expts_owt/hex_merges.json"
     
     test_tokenizer = from_files(tokenizer, vocab_filepath, merges_filepath)
     
-    print(test_tokenizer.encode("hello! I am.      panxiezhao 980402..... "))
+    result = test_tokenizer.encode(test_str)
+    print(result)
+    print(len(result))
