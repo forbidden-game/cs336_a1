@@ -35,9 +35,21 @@ class tokenizer:
         
         if self.special_tokens:
             remove_tokens_pat = '|'.join(re.escape(token) for token in self.special_tokens)
+            all_special_tokens = re.findall(remove_tokens_pat, text)
+            # print(f"all special tokens: {all_special_tokens}")
+            # print(f"len_of_special_tokens_in_this_text_is: {len(all_special_tokens)}")
+            index_special_tokens = 0
+            # print(f"splited chunks: {re.split(remove_tokens_pat, text)}")
             for chunk in re.split(remove_tokens_pat, text):
                 if chunk:
                     words.extend(re.findall(PAT, chunk))
+                # print(f"index_is: {index_special_tokens}")
+                words.append(all_special_tokens[index_special_tokens])
+                # print(f"current words is {words}")
+                index_special_tokens += 1
+                if index_special_tokens == len(all_special_tokens):
+                    break
+                    
         else:
             words = re.findall(PAT, text)
         
@@ -48,6 +60,9 @@ class tokenizer:
         text_token_encode = []
         
         for word in words:
+            if word in self.special_tokens:
+                text_token.append(word.encode('utf-8'))
+                continue
             word_token = [bytes([c]) for c in word.encode('utf-8')]
             word_length = len(word_token)
             # print(f"word_length: {word_length}")
