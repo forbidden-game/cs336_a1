@@ -42,7 +42,7 @@ class tokenizer:
             words = re.findall(PAT, text)
         
         # for bebug
-        print(words)
+        # print(words)
         
         text_token = []
         text_token_encode = []
@@ -50,19 +50,21 @@ class tokenizer:
         for word in words:
             word_token = [bytes([c]) for c in word.encode('utf-8')]
             word_length = len(word_token)
-            print(f"word_length: {word_length}")
+            # print(f"word_length: {word_length}")
             new_word_token = []
             while word_length > 1:
                 i = 0
                 while i < word_length - 1:
                     p1, p2 = word_token[i], word_token[i+1]
-                    print(f"i: {i}")
-                    print(f"fist two pair is: ({p1}, {p2})")
-                    if (p1, p2) in self.merges:
-                        new_word_token.append(p1+p2)
+                    has_token = p1 + p2
+                    # print(f"i: {i}")
+                    # print(f"fist two pair is: ({p1}, {p2})")
+                    # if (p1, p2) in self.merges:
+                    if has_token in self.vocab.values():
+                        new_word_token.append(has_token)
                         i += 2
-                        print(f"They got paired!")
-                        print(f"i+2: {i}")
+                        # print(f"They got paired!")
+                        # print(f"i+2: {i}")
                         if i == word_length - 1:
                             new_word_token.append(word_token[-1])
                     else:
@@ -73,7 +75,7 @@ class tokenizer:
                 if word_token == new_word_token:
                     break
                 word_token = new_word_token
-                print(f"word_token: {word_token}")
+                # print(f"word_token: {word_token}")
                 new_word_token = []
                 word_length = len(word_token)
                 # print(f"word_token: {word_token}")
