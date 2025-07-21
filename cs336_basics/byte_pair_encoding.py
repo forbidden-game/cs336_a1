@@ -130,6 +130,10 @@ def train_bpe(
     # Step 3: Iterative Merging (The "Fast BPE" Algorithm)
     num_merges = vocab_size - len(vocab)
     for merge_step in range(num_merges):
+        
+        if(merge_step % 100 == 0):
+            print(f"WE ARE {merge_step} merge step!")
+        
         if not pair_counts:
             break  # No more pairs to merge
         
@@ -170,7 +174,7 @@ def train_bpe(
                 # Remove old pairs
                 for j in range(len(word_tuple) - 1):
                     old_pair = (word_tuple[j], word_tuple[j+1])
-                    pair_counts[old_pair] -= freq
+                    pair_counts[old_pair] -= freq # need lookup
                     if pair_counts[old_pair] <= 0:
                         del pair_counts[old_pair]
                 
