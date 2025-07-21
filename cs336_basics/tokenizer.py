@@ -33,6 +33,7 @@ class tokenizer:
         
         words = []
         PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
+        # print("")
         
         if self.special_tokens:
             # FOR OVERLAPPING SPECIAL TOKENS!!
@@ -54,8 +55,7 @@ class tokenizer:
                         break
                     words.append(all_special_tokens[index_special_tokens])
                     # print(f"current words is {words}")
-                    index_special_tokens += 1
-                    
+                    index_special_tokens += 1             
         else:
             words = re.findall(PAT, text)
         
@@ -64,42 +64,60 @@ class tokenizer:
         
         text_token = []
         text_token_encode = []
+        merges_dict = {}
         
+        for index, merge in enumerate(self.merges):
+            merges_dict[merge] = index
+
         for word in words:
             if self.special_tokens != None and word in self.special_tokens:
                 text_token.append(word.encode('utf-8'))
                 continue
+            
+            # word class tokenize
             word_token = [bytes([c]) for c in word.encode('utf-8')]
             word_length = len(word_token)
             # print(f"word_length: {word_length}")
             new_word_token = []
             while word_length > 1:
-                i = 0
+                i = 0             
+                pair = None
+                pairs_dict = {}
+                pair_index = {}
+                
                 while i < word_length - 1:
-                    p1, p2 = word_token[i], word_token[i+1]
-                    has_token = p1 + p2
-                    # print(f"i: {i}")
-                    # print(f"fist two pair is: ({p1}, {p2})")
-                    # if (p1, p2) in self.merges:
-                    if has_token in self.vocab.values():
-                        new_word_token.append(has_token)
-                        i += 2
-                        # print(f"They got paired!")
-                        # print(f"i+2: {i}")
-                        if i == word_length - 1:
-                            new_word_token.append(word_token[-1])
-                    else:
-                        new_word_token.append(p1)
-                        i += 1
-                        if i == word_length - 1:
-                            new_word_token.append(p2)
-                if word_token == new_word_token:
+                    pair = (word_token[i], word_token[i+1])
+                    if pair in self.merges:
+                        pairs_dict[pair] = merges_dict[pair]
+                        pair_index[pair] = (i, i + 1)
+                    i += 1  
+                        
+                if pairs_dict == {}:
+                    # no pair, break
                     break
+                # print("-----------PRE_WORD TOKEN----------")
+                # print(word_token)
+                # print("-----------PAIR DICT----------")
+                # print(pairs_dict)
+                # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")  
+                best_pair = min(pairs_dict, key=lambda p: (pairs_dict[p], p))
+                paired_token = best_pair[0] + best_pair[1] 
+                j = 0
+                while j < word_length:
+                    if j == pair_index[best_pair][0]:
+                        new_word_token.append(paired_token)
+                        j += 2
+                    else:
+                        new_word_token.append(word_token[j])
+                        j += 1
+                
                 word_token = new_word_token
                 # print(f"word_token: {word_token}")
                 new_word_token = []
                 word_length = len(word_token)
-                # print(f"word_token: {word_token}")
+                # print("-----------AFTER_WORD TOKEN----------")
+                # print(word_token)
+                # print("")
 
             text_token.extend(word_token)
                     
@@ -146,6 +164,7 @@ class tokenizer:
         string_bytes = b''
         for id in ids:
             string_bytes += self.vocab[id]
+        # print(string_bytes)
         decode_string = string_bytes.decode('utf-8', errors='replace')
         # print("Final decode is ", decode_string)
         return decode_string
