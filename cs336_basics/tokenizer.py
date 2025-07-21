@@ -8,7 +8,7 @@ class tokenizer:
         vocab: dict[int, bytes],
         merges: list[tuple[bytes, bytes]],
         special_tokens: list[str] | None = None,
-        ) -> None:
+    ) -> None:
         self.vocab = vocab
         self.merges = merges
         self.special_tokens = special_tokens
@@ -19,6 +19,7 @@ class tokenizer:
             
             for bst in bytes_special_tokens:
                 if bst not in self.vocab.values():
+                    # print(f"special_tokens added to vocab is {bst}")
                     self.vocab[next_id] = bst
                     next_id += 1
                     # for debug
@@ -34,21 +35,26 @@ class tokenizer:
         PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
         
         if self.special_tokens:
-            remove_tokens_pat = '|'.join(re.escape(token) for token in self.special_tokens)
+            # FOR OVERLAPPING SPECIAL TOKENS!!
+            sorted_special_tokens = (re.escape(token) for token in sorted(self.special_tokens, key=len, reverse=True))
+            remove_tokens_pat = '|'.join(sorted_special_tokens)
             all_special_tokens = re.findall(remove_tokens_pat, text)
+            all_special_tokens_length = len(all_special_tokens)
+            index_special_tokens = 0
             # print(f"all special tokens: {all_special_tokens}")
             # print(f"len_of_special_tokens_in_this_text_is: {len(all_special_tokens)}")
-            index_special_tokens = 0
+            
             # print(f"splited chunks: {re.split(remove_tokens_pat, text)}")
             for chunk in re.split(remove_tokens_pat, text):
                 if chunk:
                     words.extend(re.findall(PAT, chunk))
                 # print(f"index_is: {index_special_tokens}")
-                words.append(all_special_tokens[index_special_tokens])
-                # print(f"current words is {words}")
-                index_special_tokens += 1
-                if index_special_tokens == len(all_special_tokens):
-                    break
+                if all_special_tokens_length:
+                    if index_special_tokens == all_special_tokens_length:
+                        break
+                    words.append(all_special_tokens[index_special_tokens])
+                    # print(f"current words is {words}")
+                    index_special_tokens += 1
                     
         else:
             words = re.findall(PAT, text)
@@ -60,7 +66,7 @@ class tokenizer:
         text_token_encode = []
         
         for word in words:
-            if word in self.special_tokens:
+            if self.special_tokens != None and word in self.special_tokens:
                 text_token.append(word.encode('utf-8'))
                 continue
             word_token = [bytes([c]) for c in word.encode('utf-8')]
@@ -140,20 +146,22 @@ class tokenizer:
         string_bytes = b''
         for id in ids:
             string_bytes += self.vocab[id]
-        return string_bytes.decode('utf-8', errors='replace')
+        decode_string = string_bytes.decode('utf-8', errors='replace')
+        # print("Final decode is ", decode_string)
+        return decode_string
     
 def from_files(
-        cls,
-        vocab_filepath: str,
-        merges_filepath: str,
-        special_tokens: list[str] | None = None
-    ) -> tokenizer:
+    cls,
+    vocab_filepath: str,
+    merges_filepath: str,
+    special_tokens: list[str] | None = None
+) -> tokenizer:
 
-        with open(vocab_filepath, 'r', encoding='utf-8') as f:
-            vocab = {int(index): bytes.fromhex(token) for index, token in json.load(f).items()}
-        merges = []
-        with open(merges_filepath, 'r', encoding='utf-8') as f:
-            for p1, p2 in json.load(f):
-                merges.append((bytes.fromhex(p1), bytes.fromhex(p2)))
-        
-        return tokenizer(vocab, merges, special_tokens)
+    with open(vocab_filepath, 'r', encoding='utf-8') as f:
+        vocab = {int(index): bytes.fromhex(token) for index, token in json.load(f).items()}
+    merges = []
+    with open(merges_filepath, 'r', encoding='utf-8') as f:
+        for p1, p2 in json.load(f):
+            merges.append((bytes.fromhex(p1), bytes.fromhex(p2)))
+    
+    return tokenizer(vocab, merges, special_tokens)
