@@ -141,6 +141,8 @@ def test_roundtrip_single_unicode_character():
     )
     test_string = "🙃"
     encoded_ids = tokenizer.encode(test_string)
+    # for debug
+    print(encoded_ids)
     decoded_string = tokenizer.decode(encoded_ids)
     assert test_string == decoded_string
 
