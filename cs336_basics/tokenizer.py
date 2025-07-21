@@ -120,7 +120,10 @@ class tokenizer:
         ids: list[int]
     ) -> str:
         
-        return "".join(self.vocab[id].decode('utf-8', errors='replace') for id in ids)
+        string_bytes = b''
+        for id in ids:
+            string_bytes += self.vocab[id]
+        return string_bytes.decode('utf-8', errors='replace')
     
 def from_files(
         cls,
