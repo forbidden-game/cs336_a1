@@ -138,23 +138,9 @@ class tokenizer:
         iterable: Iterable[str]
     ) -> Iterator[int]:
         
-        iterator = iter(iterable)
-        tokens_to_ids = {token: id for id, token in self.vocab.items()}
-        for fisrt_str in iterator:
-            first_encode = self.encode(fisrt_str)
-            first_last_token = self.vocab[first_encode[-1]]
-            try:
-                second_str = next(iterator)
-                second_encode = self.encode(second_str)
-                second_last_token = self.vocab[second_encode[-1]]
-                if_cross_token = first_last_token + second_last_token
-                
-                if if_cross_token in tokens_to_ids.keys():
-                    for id in first_encode[:-1] + [tokens_to_ids[if_cross_token]] + second_encode[1:]:
-                        yield id
-            except StopIteration:
-                for id in first_encode:
-                    yield id         
+        for str_i in iterable:
+            yield from self.encode(str_i)
+                         
     
     def decode(
         self,
